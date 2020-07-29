@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from src.layers import GraphConvolution, MLPLayer, DecodeLink
 
 
-class MLP(nn.Module):
+class MLP(nn.Module):#多层感知机
     def __init__(self, input_dim, hidden_dim, output_dim, layer=1):
         super(MLP, self).__init__()
         if layer==1:
@@ -33,7 +33,7 @@ class MLP(nn.Module):
         return predicted.cpu().numpy(), precision
 
 
-class GCNDecoder(nn.Module):
+class GCNDecoder(nn.Module):#对于三种类型的社交数据进行Decoder
     def __init__(self, device, embedding, nfeat, nhid, ncont, nrel, rel_dim, dropout, a, b, c, d, tau=1.0, hard_gumbel=False, lamb=1e-7):
         super(GCNDecoder, self).__init__()
         self.embedding = nn.Embedding.from_pretrained(embedding, freeze=False)
@@ -55,9 +55,10 @@ class GCNDecoder(nn.Module):
         self.relations_log_sigma = nn.Parameter(torch.FloatTensor(nrel, rel_dim).uniform_(-0.5 / rel_dim, 0.5 / rel_dim))
         self.m = torch.distributions.Normal(torch.zeros(nrel, rel_dim), torch.ones(nrel, rel_dim))
 
-        self.encoder = GraphConvolution(nfeat, self.nembed)
-        self.encoder1 = MLPLayer(2*nfeat, rel_dim)
+        self.encoder = GraphConvolution(nfeat, self.nembed)#Encoder部分就是GCN对于节点生成向量表示
+        self.encoder1 = MLPLayer(2*nfeat, rel_dim)#以及多层感知机进行Embedding生成
         self.decoder = MLPLayer(self.nhid, nrel)
+        #原文就三部分Decoder，这里为什么四部分Decoder
         self.decoder1 = MLPLayer(rel_dim, 2*nfeat, 2)  # recover node feature
         self.decoder2 = MLPLayer(rel_dim, 1, 2)    # recover graph structure
         # self.decoder2 = DecodeLink(nhid)
@@ -66,7 +67,7 @@ class GCNDecoder(nn.Module):
         # self.decoder4 = DecodeLink(nhid)
         self.dropout = dropout
 
-    def forward_encoder(self, x, adj, return_pair=True):
+    def forward_encoder(self, x, adj, return_pair=True):#这里是通过GCN在给定输入的情况下，给出指定节点的Embedding
         h = F.relu(self.encoder(x, adj))
         h = F.dropout(h, self.dropout, training=self.training)
         if return_pair:
@@ -97,9 +98,11 @@ class GCNDecoder(nn.Module):
         label = label.to(self.device)
         nodes = torch.LongTensor(nodes).to(self.device)
         if prior is not None: prior = prior.to(self.device)
-        g_ij = self.forward_encoder(input, adj)
-        decoder_loss, h_ij = self.forward_decoder(g_ij, nodes, prior)
+        g_ij = self.forward_encoder(input, adj)#通过Encoder中GCN部分，得到图中指定节点对的向量表示
+        decoder_loss, h_ij = self.forward_decoder(g_ij, nodes, prior)#对于指定的节点对，通过这一步的decoder得到节点对之间关系的向量表示h_ij
 
+        #这里四种mode分别对应四种类型的数据，即通过解码h_ij还原四种类型的数据
+        #注意这里使用了不同的loss
         if mode == 'node':
             output = self.decoder1(h_ij)
             loss = self.a * (F.mse_loss(output, label) + decoder_loss)
@@ -122,11 +125,10 @@ class GCNDecoder(nn.Module):
         features = features.to(self.device)
         adj = adj.to(self.device)
         # embedding = torch.spmm(adj, features).data.cpu().numpy()
-        embedding = self.forward_encoder(features, adj, return_pair=False).data.cpu().numpy()
+        embedding = self.forward_encoder(features, adj, return_pair=False).data.cpu().numpy()#这里与forward部分生成embedding的方式相同
         return embedding
 
     def save_embedding(self, features, adj, path, binary=True):
         learned_embed = gensim.models.keyedvectors.Word2VecKeyedVectors(self.nembed)
         learned_embed.add(list(range(len(features))), self.generate_embedding(features, adj))
-        learned_embed.save_word2vec_format(fname=path, binary=binary, total_vec=len(features))
-
+        learned_embed.save_word2vec_format(fname=path, binary=binary, total_vec=len(features))#对于通过GCN生成的每个节点的embedding，进行保存

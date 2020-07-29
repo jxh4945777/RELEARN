@@ -75,7 +75,8 @@ class Dataset:
             superv['diffusion'][i] = np.array(l)
         return superv
 
-    def sample_subgraph(self, selection, generate_prior=True, return_nodes=False):
+    #每一种类型数据的采样都需要最终进行子图采样处理
+    def sample_subgraph(self, selection, generate_prior=True, return_nodes=False):#采样子图
         """
             1. Selecting edges according to the selection indexs.
             2. For each node, sampling their neighbor nodes.

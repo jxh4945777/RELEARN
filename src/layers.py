@@ -38,6 +38,7 @@ class DecodeLink(Module):
         return output
 
 
+#这里直接沿用了已有的简单的GCN算法
 class GraphConvolution(Module):
     """
     Simple GCN layer, similar to https://arxiv.org/abs/1609.02907

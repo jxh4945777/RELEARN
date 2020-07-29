@@ -54,6 +54,7 @@ def parse_args():
 
 
     # sample settings
+    #这个参数定义模型包含的数据类型
     parser.add_argument("--sample_mode", type=str, default='n|l|dc|ds',
                         help="n:node, l:link, dc:diffusion content, ds:diffusion structure")
     parser.add_argument('--diffusion_threshold', default=10, type=int,
@@ -214,6 +215,7 @@ def train(args, embedding, Data, log_dir, logger, writer=None):
     model.to(args.device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
+    #这里根据args中的参数，创建数据类型识别的list
     args.modes = []
     if 'n' in args.sample_mode and model.a > 0:
         args.modes.append('node')
@@ -231,9 +233,13 @@ def train(args, embedding, Data, log_dir, logger, writer=None):
 
     for epoch in range(1, args.epochs+1):
         losses = []
+        #对于每一种数据进行采样
+        #所以可以理解为这里是对于每一种类型的数据依次进行训练，但这样是否会出现反复横跳
         for mode in args.modes:
             optimizer.zero_grad()
+            #这里是每一步取sample，包括特征值作为输入，邻接矩阵
             (sampled_features, sampled_adj, prior, nodes), sampled_labels = Data.sample(mode, return_nodes=True)
+
             loss = model(sampled_features, sampled_adj, sampled_labels, mode, nodes, prior)
             if torch.isnan(loss):
                 print('nan loss!')
@@ -269,7 +275,7 @@ def train(args, embedding, Data, log_dir, logger, writer=None):
                 best_acc = test_acc
                 best_std = std
                 best_epoch = epoch
-                save_embedding(learned_embed, os.path.join(log_dir, 'embedding.bin'))
+                save_embedding(learned_embed, os.path. join(log_dir, 'embedding.bin'))
                 save_checkpoint({
                     'args': args,
                     'model': model.state_dict(),
@@ -291,14 +297,14 @@ def train(args, embedding, Data, log_dir, logger, writer=None):
 if __name__ == '__main__':
     # Initialize args and seed
     args = parse_args()
-    # print('Number CUDA Devices:', torch.cuda.device_count())
+    print('Number CUDA Devices:', torch.cuda.device_count())
     # call(["nvidia-smi", "--format=csv", "--query-gpu=index,name,driver_version,memory.total,memory.used,memory.free"])
-    # torch.cuda.device(args.gpu)
+    torch.cuda.device(args.gpu)
     args.device = torch.device("cuda:{}".format(args.gpu) if torch.cuda.is_available() and args.gpu > -1 else "cpu")
-    # print('Active CUDA Device: GPU', torch.cuda.current_device())
-    # np.random.seed(args.seed)
-    # torch.manual_seed(args.seed)
-    # torch.cuda.manual_seed(args.seed)
+    print('Active CUDA Device: GPU', torch.cuda.current_device())
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
 
     args.superv_ratio = float(args.superv_ratio)
 

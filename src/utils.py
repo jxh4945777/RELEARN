@@ -87,7 +87,7 @@ def load_data(path="data/dblp/", dataset="dblp", diffusion_threshold=10, from_te
         next(link_file)
         links = []
         for line in link_file:
-            d1, d2 = line.rstrip().split(',')
+            d1, d2 = line.rstrip().split(',')#链接分正向和反向
             links.append([int(d1), int(d2)])
             links.append([int(d2), int(d1)])
     links = np.array(links)
