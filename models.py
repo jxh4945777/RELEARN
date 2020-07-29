@@ -79,10 +79,9 @@ class GCNDecoder(nn.Module):#对于三种类型的社交数据进行Decoder
         z_ij = F.gumbel_softmax(self.decoder(g_ij), tau=self.tau, hard=self.hard_gumbel)
 
         std_z = self.m.sample().to(self.device)
-
         rel_var = self.relations_mean + self.relations_log_sigma.exp() * std_z
         rel_var = F.dropout(rel_var, self.dropout, training=self.training)
-        #这里rel_var指的就是基底向量(关系数*维度) @为进行矩阵乘法，得到最终ij的关系embedding
+
         h_ij0 = z_ij @ rel_var
 
         if prior is None:
