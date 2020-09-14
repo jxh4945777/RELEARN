@@ -241,7 +241,7 @@ class Dataset:
 
         return sample_pairs, sample_negative_pairs, diff_content.repeat((self.sample_size, 1))
 
-    def sample_diffusion_content(self):
+    def sample_diffusion_content(self):#这里是对于同一个diffusion下，任意两个节点成对进行decoder
         """
         sample node pairs from sampled diffusion
         :param sample_size:
@@ -251,7 +251,7 @@ class Dataset:
         index = random.randint(0, self.num_diff - 1)
         diff_subgraph, diff_content = self.diffusion[index]
         sample_nodes = np.random.choice(diff_subgraph, self.sample_size * 2)
-        sample_pairs = sample_nodes.reshape(self.sample_size, 2)
+        sample_pairs = sample_nodes.reshape(self.sample_size, 2)#这里是对于同一个diffusion下，任意两个节点成对进行decoder
 
         if self.use_superv:
             diff_l = self.superv['diffusion'][index]
@@ -265,7 +265,7 @@ class Dataset:
 
         return sample_pairs.tolist(), diff_content.repeat((len(sample_pairs), 1))
 
-    def sample_diffusion_structure(self):
+    def sample_diffusion_structure(self):#解码的是节点对之间的链接
         """
         sample node pairs from sampled diffusion
         :param sample_size:
