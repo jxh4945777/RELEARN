@@ -89,12 +89,12 @@ class Dataset:
             3. Build a partial adjacency matrix and neigbor feature vector.
         """
 
-        if isinstance(selection, list):
+        if isinstance(selection, list):#判断是否为list
             if isinstance(selection[0], list):
                 final_l = [i for l in selection for i in l]
             else:
                 final_l = selection
-        elif isinstance(selection, np.ndarray):
+        elif isinstance(selection, np.ndarray):#如果是多维的ndarray，则拉伸
             final_l = selection.flatten()
         else:
             exit('unknown type for selection')
@@ -115,14 +115,14 @@ class Dataset:
         # dim_check = 0
         final_input_features = torch.tensor([])
         for idx in final_l:
-            if idx not in self.graph:
+            if idx not in self.graph:#意味着该ID的节点是独立节点
                 sampled_neighbors.append([idx])
                 if final_input_features.shape[0] == 0 :
                     final_input_features = self.features[idx].view(1,-1)
                 else: final_input_features = torch.cat((final_input_features, self.features[idx].view(1,-1)))
                 col_dim+=1
                 # dim_check+=1
-            else:
+            else:#对于idx索引的节点，及其边进行采样，并且将采样到的节点(idx索引的节点及其邻居节点)的feature embedding加入到final_input_features
                 if len(self.graph[idx]) <= self.neighbor_sample_size:
                     sampled_neighbors.append([idx] + self.graph[idx])
                     if final_input_features.shape[0] == 0 :
@@ -132,8 +132,8 @@ class Dataset:
                     final_input_features = torch.cat((final_input_features, self.features[self.graph[idx]]))
                     col_dim+= (1+self.features[self.graph[idx]].shape[0])
                     # dim_check+=(1+self.features[self.graph[idx]].shape[0])
-                else:
-                    idx_for_sample = np.random.randint(0,len(self.graph[idx]), self.neighbor_sample_size)
+                else:#如果采样的中心节点邻居较多，则随机采样部分邻居节点
+                    idx_for_sample = np.random.randint(0,len(self.graph[idx]), self.neighbor_sample_size)#随机采样
                     sample_set = [self.graph[idx][x_j] for x_j in range(len(self.graph[idx])) if x_j in set(idx_for_sample)]
                     sampled_neighbors.append([idx] + sample_set)
                     if final_input_features.shape[0] == 0 :
@@ -151,12 +151,13 @@ class Dataset:
 
         # sampled_labels = torch.cat((final_features_1, final_features_2), dim = 1)
         # return final_input_features, sampled_adj, sampled_labels, torch.nonzero(torch.sum(sampled_labels, 1)).shape[0]
+        # 维度记录 final_input_features(1485,300)  sampled_adj(100,1485)
         if return_nodes:
             return final_input_features, torch.from_numpy(sampled_adj).float(), prior, final_l
         else:
             return final_input_features, torch.from_numpy(sampled_adj).float(), prior
 
-    def sample_node(self, sample_size, nonzero=True):
+    def sample_node(self, sample_size, nonzero=True):#随机选择节点采样
         """
         sample node
         :param sample_size:
@@ -167,7 +168,7 @@ class Dataset:
         else:
             return np.random.randint(1, self.num_node, sample_size)
 
-    def sample_node_pair(self):
+    def sample_node_pair(self): #如果是有监督的情况下，取一部分作为有监督的数据(存在node_pair且有标签)，一部分作为无监督的数据
         """
         sample node pair for node feature recovery
         :param sample_size:
@@ -183,7 +184,7 @@ class Dataset:
                 sample_superv_pairs = sample_nodes.reshape(self.superv_sample_size, 2)
             sample_pairs = np.concatenate([sample_pairs, sample_superv_pairs], axis=0)
 
-        return sample_pairs
+        return sample_pairs#按比例进行sample
 
     def sample_link(self):
         """
@@ -192,15 +193,16 @@ class Dataset:
         :return:
         """
         sample_size = int((self.sample_size) / (1 + self.negative_sample_size))
-        sample_link = self.links[np.random.randint(0, self.num_link, sample_size)]
+        sample_link = self.links[np.random.randint(0, self.num_link, sample_size)]#从数据集读取到的所有连接中采样其中一部分
         if self.use_superv:
             sample_size = int((self.superv_sample_size) / (1 + self.negative_sample_size))
             if len(self.superv['link'])>0:
                 sample_superv_link = self.superv['link'][np.random.randint(0, self.num_superv_link, sample_size)]
             else:
                 sample_superv_link = self.links[np.random.randint(0, self.num_link, sample_size)]
-            sample_link = np.concatenate([sample_link, sample_superv_link], axis=0)
-        sample_node = self.sample_node(100, False)
+            sample_link = np.concatenate([sample_link, sample_superv_link], axis=0)#按比例采样有标注和无标注的边
+        #这里开始采样负样本，作为没有连接的节点对，但需要考虑是否固定是100个
+        sample_node = self.sample_node(100, False)#这里固定是100个么？
         sample_negative_link = []
         idx = 0
         for link in sample_link:
@@ -214,7 +216,7 @@ class Dataset:
 
         return sample_link.tolist(), sample_negative_link
 
-    def sample_diffusion(self):
+    def sample_diffusion(self):#貌似这个就没有用到
         """
         sample node pairs from sampled diffusion
         :param sample_size:
@@ -223,7 +225,7 @@ class Dataset:
 
         diff_subgraph, diff_content = random.choice(self.diffusion)
         sample_nodes = np.random.choice(diff_subgraph, self.sample_size * 2)
-        sample_pairs = sample_nodes.reshape(self.sample_size, 2).tolist()
+        sample_pairs = sample_nodes.reshape(self.sample_size, 2).tolist()#从diff_subgraph中随机采样的节点对
 
         sample_node = self.sample_node(100, False)
         sample_negative_pairs = []
@@ -302,12 +304,12 @@ class Dataset:
         return sample_pairs.tolist(), sample_negative_pairs
 
     def sample(self, mode, return_nodes=False):
-        if mode == 'node':
+        if mode == 'node':#采样节点 - 用于第一类信息decoder
             samples = self.sample_node_pair()
             # samepled_features, sampled_adj, sampled_labels, nzero = self.sample_subgraph(samples, True)
             node_features = self.features.index_select(0, torch.LongTensor(samples.flatten())).view(-1, 2*self.feature_len)
             return self.sample_subgraph(samples, return_nodes=return_nodes), node_features
-        elif mode == 'link':
+        elif mode == 'link':#采样正负样本的连接节点对 - 用于第二类信息decoder
             positive_link, negative_link = self.sample_link()
             # samepled_features, sampled_adj = self.sample_subgraph(positive_link + negative_link)
             return self.sample_subgraph(positive_link + negative_link, return_nodes=return_nodes), self.binary_label
