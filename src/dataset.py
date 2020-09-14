@@ -25,28 +25,34 @@ class EvaDataset(Dataset):
 
 
 class Dataset:
+    # 数据说明
+    # 邻接矩阵 adj -> affinity_matrix.p -> Tensor(23417, 23417)
+    # 输入特征 features -> features.p -> Tensor(23417, 300)
+    # 图的链接情况 graph -> graph.p -> Dict(23417, 连接的节点数) 数据示例: 4424:[937, 6041, 7646 ...] 每一行是一个节点以及链接的相应节点
+    # 信息传递情况 diffusion -> diffusion.p -> Dict(293,Tuple(2, (信息传递的节点数, 信息Embedding的维度))) 数据实例: 110186:((信息传递的节点), (信息Embedding))
+    # 节点链接情况 link -> link.csv -> ndarray(564290, 2) 每行代表两个链接节点的id
     def __init__(self, args, dataset):
         self.adj, self.features, self.graph, self.old_adj, self.links, self.nonzero_nodes, self.diffusion \
             = load_data(f'data/{dataset}/', dataset, args.diffusion_threshold)
 
-        self.num_node, self.feature_len = self.features.shape
-        self.content_len = len(self.diffusion[0][1])
-        self.num_link = len(self.links)
-        self.num_diff = len(self.diffusion)
-        self.num_label = args.output_dim
+        self.num_node, self.feature_len = self.features.shape #23417, 300
+        self.content_len = len(self.diffusion[0][1]) #300
+        self.num_link = len(self.links) #564290
+        self.num_diff = len(self.diffusion) #293
+        self.num_label = args.output_dim #2
 
-        self.neighbor_sample_size = args.neighbor_sample_size
-        self.sample_size = args.sample_size
-        self.negative_sample_size = args.negative_sample_size
+        self.neighbor_sample_size = args.neighbor_sample_size #30
+        self.sample_size = args.sample_size #200
+        self.negative_sample_size = args.negative_sample_size #negative sample / positive sample = 1
 
         sample_size = int(self.sample_size / (1 + self.negative_sample_size))
         self.binary_label = torch.FloatTensor([1]*sample_size + [0]*self.negative_sample_size*sample_size).view(-1, 1)
 
         self.use_superv = args.use_superv
-        if args.use_superv:
+        if args.use_superv: #如果使用有监督的训练方式，则需要对数据进行处理
             self.superv_sample_size = int(args.t*self.sample_size)
             self.sample_size = self.sample_size-self.superv_sample_size
-            self.prior, ls = {}, []
+            self.prior, ls = {}, [] #Prior是对于每条链接数据的具体信息，包括两端节点ID, 三种模态信息，具体关系类型
             for (d1, d2, l) in args.train:
                 d1, d2 = int(d1), int(d2)
                 ls += [(d1, d2), (d2, d1)]
@@ -57,13 +63,13 @@ class Dataset:
             self.num_superv_node = len(ls)
             self.num_superv_link = len(self.superv['link'])
 
-    def set_superv_sample_ratio(self, t):
+    def set_superv_sample_ratio(self, t):#根据有监督比率进行采样数目的设定
         if t > 0:
             sample_size = self.sample_size + self.superv_sample_size
             self.superv_sample_size = int(t * sample_size)
             self.sample_size = sample_size - self.superv_sample_size
 
-    def build_superv_dict(self):
+    def build_superv_dict(self):#对于有监督的数据进行内容的采样，构建superv的dict
         superv = {'link':[], 'diffusion':{}}
         superv['link'] = np.array([(s, c) for (s, c) in self.links if (s, c) in self.prior])
         for i, (diff, _) in enumerate(self.diffusion):

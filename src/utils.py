@@ -66,7 +66,12 @@ def encode_onehot(labels):
                              dtype=np.int32)
     return labels_onehot
 
-
+#数据说明
+#邻接矩阵 adj -> affinity_matrix.p -> Tensor(23417, 23417)
+#输入特征 features -> features.p -> Tensor(23417, 300)
+#图的链接情况 graph -> graph.p -> Dict(23417, 连接的节点数) 数据示例: 4424:[937, 6041, 7646 ...] 每一行是一个节点以及链接的相应节点
+#信息传递情况 diffusion -> diffusion.p -> Dict(293,Tuple(2, (信息传递的节点数, 信息Embedding的维度))) 数据实例: 110186:((信息传递的节点), (信息Embedding))
+#节点链接情况 link -> link.csv -> ndarray(564290, 2) 每行代表两个链接节点的id
 def load_data(path="data/dblp/", dataset="dblp", diffusion_threshold=10, from_text=False):
     """Load citation network dataset (cora only for now)"""
     print('Loading {} dataset...'.format(dataset))
@@ -95,8 +100,10 @@ def load_data(path="data/dblp/", dataset="dblp", diffusion_threshold=10, from_te
     feature_sum = np.sum(features, axis=1)
     nonzero_nodes = np.nonzero(feature_sum)[0]
     print("total nonzero features in utils:", len(nonzero_nodes))
+
+    # Feature normalization
     features = normalize(features)
-    features = sp.csr_matrix(features)
+    features = sp.csr_matrix(features)#这里是对于稀疏矩阵进行压缩存储
 
     # labels = features  # labels will be recalculated in data sampling process
     # adj = sp.coo_matrix(adj) # change format from csr to coo
