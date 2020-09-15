@@ -58,7 +58,7 @@ class GCNDecoder(nn.Module):#对于三种类型的社交数据进行Decoder
         self.encoder = GraphConvolution(nfeat, self.nembed)#Encoder部分就是GCN对于节点生成向量表示
         self.encoder1 = MLPLayer(2*nfeat, rel_dim)#以及多层感知机进行Embedding生成
         self.decoder = MLPLayer(self.nhid, nrel)
-        #原文就三部分Decoder，这里为什么四部分Decoder
+        #原文就三部分Decoder，这里为什么四部分Decoder,因为这里将diffusion分成了两部分，分别考虑结构信息与内容信息
         self.decoder1 = MLPLayer(rel_dim, 2*nfeat, 2)  # recover node feature
         self.decoder2 = MLPLayer(rel_dim, 1, 2)    # recover graph structure
         # self.decoder2 = DecodeLink(nhid)
@@ -79,16 +79,16 @@ class GCNDecoder(nn.Module):#对于三种类型的社交数据进行Decoder
         z_ij = F.gumbel_softmax(self.decoder(g_ij), tau=self.tau, hard=self.hard_gumbel)
 
         std_z = self.m.sample().to(self.device)
-        rel_var = self.relations_mean + self.relations_log_sigma.exp() * std_z
+        rel_var = self.relations_mean + self.relations_log_sigma.exp() * std_z#这里的self.relations_mean和log_sigma是可训练的
         rel_var = F.dropout(rel_var, self.dropout, training=self.training)
 
-        h_ij0 = z_ij @ rel_var
+        h_ij0 = z_ij @ rel_var#GMM关键操作
 
-        if prior is None:
+        if prior is None:#如果有
             prior = torch.ones_like(z_ij)/self.nrel
 
-        kl = (z_ij - prior).pow(2).sum(1).mean()
-        l2_loss = ((h_ij - h_ij0)**2).mean(dim=1).mean()
+        kl = (z_ij - prior).pow(2).sum(1).mean()#这里作为Loss的第一部分，要使得z_ij尽可能接近真实分布
+        l2_loss = ((h_ij - h_ij0)**2).mean(dim=1).mean()#这里作为Loss的第二部分，要使得通过encoder得到的hij 与 通过GMM分布得到的hij0尽可能接近
 
         return kl+l2_loss, h_ij
 
